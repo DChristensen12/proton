@@ -1,47 +1,69 @@
 # PROTON
 
-**P**hysics-informed **R**adiation **O**perator and **T**ime-series **O**ptimized **N**etwork. This is a distributed scientific machine learning framework integrating physics-informed neural networks, stochastic quantum diffusion modeling, and spatiotemporal Fourier Neural Operators across a live ESP32 edge sensor mesh.
+**P**hysics-informed **R**adiation **O**perator and **T**ime-series **O**ptimized **N**etwork.
 
-## Project Overview
+A pipeline that starts from a real radiation sensor on the desk and
+scales up to a distributed spatial mapping demo, with the laptop as the compute
+hub. The phases are independent enough to build and test one at a time.
 
-This repository will host a distributed scientific machine learning framework designed to map space weather patterns and atmospheric cosmic ray transport. Instead of running calculations on decoupled simulations, PROTON handles continuous real-time data ingress from local hardware sensors and uses three distinct mathematical architectures to model, generate, and map physical particle fields.
+## What the hardware can actually do
 
-The system leverages a centralized high-performance computing node (my local laptop) to handle the heavy neural tensor operations, while low-power microcontrollers act as a distributed network array to pipe spatial coordinates across a home network.
+The sensor is an FNIRSI GC-01 flashed with Rad Pro firmware. Rad Pro speaks a
+request-response protocol over USB, not a continuous stream. You send a command,
+it replies once. The full command set is documented at
+https://github.com/Gissio/radpro/blob/main/docs/comm.md
 
----
+The most important consequence for this project: there is no command that gives
+you a timestamp for each individual pulse. The finest grained real time signal
+is polling the cumulative pulse count. Genuine per-pulse arrival timing would
+need a hardware tap on the tube pulse line, which is an optional add-on, not
+part of the base kit. Phase 2 is written with that in mind.
 
-## Hardware Architecture
+## Layout
 
-The physical system consists of a primary radiation instrument acting as a ground truth baseline, connected alongside a decentralized sensor array:
+    proton/
+      common/                     shared code used by every phase
+        radpro_serial.py          the protocol wrapper, the foundation
+        units.py                  counts to the five display units
+      phase0_hardware/            flashing, verification, raw data access
+        diagnostics/
+          get_device_id.py        confirm the device is talking
+          get_tube_sensitivity.py read the counts to dose constant
+          probe_capabilities.py   inventory every supported command
+          live_monitor.py         watch all units update in real time
+          download_datalog.py     pull the on-device flash log to CSV
+        config/
+          device_config.py        device facts in one place
+      phase1_pinn/                local PINN modeling
+      phase2_diffusion/           generative inter-arrival modeling
+      phase3_fno/                 distributed FNO mesh
+    data/
+      raw/  processed/  logs/
+    notebooks/
+    tests/
 
-* **Primary Sensor Node:** FNIRSI GC-01 Geiger Counter running open-source Rad Pro firmware to expose its raw telemetry.
-* **Data Ingress Pipeline:** High-speed USB-C to USB-A data interface operating at a 115200-baud serial communication rate.
-* **Distributed Spatial Mesh Nodes:** Three ESP32 development boards configured as wireless edge devices communicating over a local Wi-Fi protocol.
+## Getting started, Phase 0
 
----
+1. Flash Rad Pro on the GC-01 and toggle Data Mode ON in settings. Note that
+   the flashing step itself wants a Windows machine per the Rad Pro install
+   guide, even though everything after runs fine on Linux.
+2. Plug in with a real data cable, not a charge-only one.
+3. Install dependencies:
 
-## Mathematical and Machine Learning Framework
+       pip install -r requirements.txt
 
-The codebase operates across three distinct mathematical modules to process the data stream:
+4. Confirm the link:
 
-### 1. 1D Physics-Informed Neural Network (PINN)
+       python proton/phase0_hardware/diagnostics/get_device_id.py
 
-The initial module handles localized edge inference using continuous stream values from the primary sensor. We use PyTorch and its automatic differentiation engine (`torch.autograd`) to enforce known physics constraints directly into the loss function of the model.
+5. Read the sensitivity, which everything downstream depends on:
 
-Instead of tracking arbitrary numerical patterns, the network is restricted by the 1D Boltzmann transport equation and atmospheric attenuation parameters:
+       python proton/phase0_hardware/diagnostics/get_tube_sensitivity.py --port /dev/ttyACM0
 
-$$Loss = Loss_{Data} + \lambda Loss_{Physics}$$
+6. Inventory everything the device supports:
 
-### 2. Quantum-Driven Generative Diffusion Model
+       python proton/phase0_hardware/diagnostics/probe_capabilities.py --port /dev/ttyACM0
 
-Nuclear decay and cosmic background strikes represent a true quantum Poisson process. This module extracts the exact inter-arrival timestamps ($\Delta t$) between individual high-energy particle collisions.
+Run the scripts from the project root so the imports resolve.
 
-We implement a continuous-time autoregressive diffusion model that learns to reverse standard Gaussian noise profiles back into the non-Gaussian quantum uncertainty signatures unique to our local background radiation envelope. This allows us to generate infinite synthetic space weather tracks grounded in real physical distributions.
-
-### 3. Spatiotemporal Fourier Neural Operator (FNO)
-
-The final module expands the project into multi-dimensional spatial mapping. The three wireless ESP32 nodes stream coordinate data over a local MQTT broker to simulate high-altitude data collection profiles.
-
-The framework processes these functional inputs using a Fourier Neural Operator. By applying Fast Fourier Transforms (FFTs), the model maps the inputs into the frequency domain, solves the continuous partial differential equations governing regional radiation transport, and projects an instantaneous 3D geographic space weather grid.
-
-This project is a word in progress and will be updated throughout the year! Stay tuned!
+This project is a work in progress and will be updated throughout the year! Stay tuned!

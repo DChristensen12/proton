@@ -1,0 +1,13 @@
+# Phase 0 and Phase 1 core
+pyserial>=3.5
+numpy>=1.24
+
+# Phase 1 PINN and Phase 2 diffusion
+torch>=2.0
+
+# Phase 3 FNO and MQTT mesh
+paho-mqtt>=1.6
+
+# Analysis and plotting, used across notebooks
+matplotlib>=3.7
+pandas>=2.0
